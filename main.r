@@ -48,7 +48,7 @@ getLeagues <- function()
 # Leagues Ignored in HKJC 
 getIgnoredLeagues <- function()
 {
-  return ( c("UE Conference","Dutch Division 2","Chilean Division 1", "South American Cup", "Japanese Division 2","Argentine Division 1", "Mexican Premier"))
+  return ( c("UE Conference","Dutch Division 2","Chilean Division 1", "South American Cup", "Japanese Division 2","Argentine Division 1", "Mexican Premier", "Korean Division 1","Brazilian Division 1"))
 }
 
 sanitizeName <- function (name )
@@ -69,7 +69,7 @@ getModelOdds <- function(nday)
   
   leagues = getLeagues()
   
-  targetDays = today+ c(0:nday)
+  targetDays = today+ c((-1):nday)
   
   x<- subset (raw, as.Date(raw$date) %in% targetDays &  raw$league %in% leagues & is.na(raw$xg1) )
   
@@ -127,6 +127,10 @@ ReadOddsFromPath <- function(json_path)
   return (res)  
 }
 
+SaveMatchTeams <- function( mapping)
+{
+  write.csv(file ='Matching.csv', mapping, row.names =FALSE)
+}
 
 LoadMatchTeams <- function(){
   res = read.csv(file = 'Matching.csv',header = TRUE)
@@ -135,6 +139,8 @@ LoadMatchTeams <- function(){
        nrow( res[ which (duplicated(res$JC)),])!= 0 )
   {
     print ("ERROR: DUPLICATE")
+    print( res[ which (duplicated(res$Model)),])
+    
   }
   
   # Doesnt work for some reason, maybe the encoding during source('main/r')
@@ -147,6 +153,22 @@ LoadMatchTeams <- function(){
   
   return ( res)
 }
+
+
+addToMappingFile <- function(newMapping)
+{
+  existing = LoadMatchTeams()
+  toAdd = data.table()
+  
+  for(i in 1:nrow(newMapping))
+  {
+    if (newMapping$Model[i] %in% existing$Model)
+      next
+    toAdd = rbind(toAdd, newMapping[i,])
+  }
+  SaveMatchTeams(rbind(existing,toAdd))
+}
+
 
 ### Find the row id in model_teams 
 resolveInd <- function( team, modelTeams,storedMatch)
@@ -184,7 +206,6 @@ MatchRowInds <- function(hkjc_odds, model_odds)
     {
       #### not found 
       findind[i]=NA
-      break
       next
     } else
     {
@@ -287,7 +308,6 @@ newMappingSuggestion <-function(model_odds, unresolvedJCNames)
     }else   {
       print(paste(team,"not found"))
     }
-    
   }
-  return (mapping)
+  return (mapping[which(JC!=Model)])
 }

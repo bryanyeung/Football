@@ -1,6 +1,5 @@
 source('main.r' )
 
-
 ##### 1.  Prepare Model
 raw = getModelFile()
 model_odds = getModelOdds(3) 
@@ -9,7 +8,6 @@ model_odds = getModelOdds(3)
 
 
 json_path <- "https://bet.hkjc.com/football/getJSON.aspx?jsontype=odds_had.aspx"
-#json_file<- 'getJSON.json'
 hkjc_odds <- ReadOddsFromPath(json_path )
 
 #### 3. Process and match entries 
@@ -26,6 +24,7 @@ if (length(which(is.na(findind)))>0) {
   newMapping  <- newMappingSuggestion(model_odds,unique(c( hkjc_odds_missing$HomeTeam,hkjc_odds_missing$AwayTeam)))
   print("Add to mapping?")
   newMapping
+  #addToMappingFile(   newMapping[c(5)])
 }
 
 ### Continue with betting action 
