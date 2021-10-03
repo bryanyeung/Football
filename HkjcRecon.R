@@ -32,4 +32,4 @@ if (length(which(is.na(findind)))>0) {
 BettingSuggestion = BetSignal(hkjc_odds,findind)
 BettingSuggestion
 
-View(BettingSuggestion)
+#View(BettingSuggestion)

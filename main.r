@@ -309,5 +309,7 @@ newMappingSuggestion <-function(model_odds, unresolvedJCNames)
       print(paste(team,"not found"))
     }
   }
+  
+  if (nrow(mapping)== 0) return (mapping)
   return (mapping[which(JC!=Model)])
 }
