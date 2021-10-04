@@ -48,7 +48,8 @@ getLeagues <- function()
 # Leagues Ignored in HKJC 
 getIgnoredLeagues <- function()
 {
-  return ( c("UE Conference","Dutch Division 2","Chilean Division 1", "South American Cup", "Japanese Division 2","Argentine Division 1", "Mexican Premier", "Korean Division 1","Brazilian Division 1"))
+  return ( c("UE Conference","Dutch Division 2","Chilean Division 1", "South American Cup", "Japanese Division 2","Argentine Division 1", "Mexican Premier",
+             "Korean Division 1","Brazilian Division 1","Eng League Trophy","Japanese League Cup","Euro Nations League"))
 }
 
 sanitizeName <- function (name )
