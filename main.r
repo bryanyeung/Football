@@ -49,7 +49,8 @@ getLeagues <- function()
 getIgnoredLeagues <- function()
 {
   return ( c("UE Conference","Dutch Division 2","Chilean Division 1", "South American Cup", "Japanese Division 2","Argentine Division 1", "Mexican Premier",
-             "Korean Division 1","Brazilian Division 1","Eng League Trophy","Japanese League Cup","Euro Nations League"))
+             "Korean Division 1","Brazilian Division 1","Eng League Trophy","Japanese League Cup","Euro Nations League"
+             ,"WC Qualifiers","Argentine Cup", "International Matches", "U21 Euro Qualifiers"))
 }
 
 sanitizeName <- function (name )
@@ -60,6 +61,7 @@ sanitizeName <- function (name )
   if (substr(name, 3, 14)  ==  "stersunds FK")  return ("Ostersunds FK")
   if (substr( name, 0, 14) == "SpVgg Greuther" ) return("SpVgg Greuther Furth")
   if (substr( name, 0, 9)  == "Fortuna D" &&  substr(name,12,19) == "sseldorf") return ("Fortuna Dusseldorf")
+  if (substr( name, 0, 1)  == "M" && substr(name,4,10) == "laga") return ("Malaga")
   return (name)
 }
 
