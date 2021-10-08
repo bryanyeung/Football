@@ -225,7 +225,8 @@ kellyToBet <- function(x)
 
 BetSignal <- function( hkjc_odds, findind)
 {
-  
+  hkjc_odds = hkjc_odds[!is.na(findind),]
+  findind = findind[!is.na(findind)]
   ModelImpHomeOdd = model_odds$Win[findind]
   ModelImpDrawOdd = model_odds$Draw[findind]
   ModelImpAwayOdd = model_odds$Lose[findind]
@@ -262,7 +263,7 @@ newMappingSuggestion <-function(model_odds, unresolvedJCNames)
   hkjcTeamNames  <- unique (unresolvedJCNames )
   storedMatch = LoadMatchTeams()
   
-  mapping = c() 
+  mapping = data.table()
   
   for ( team in modelTeamNames )
   {

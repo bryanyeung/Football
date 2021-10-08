@@ -22,19 +22,17 @@ if(nrow(hkjc_odds) == 0)
     print ("Missing")
     hkjc_odds_missing = hkjc_odds[which(is.na(findind)),]
     print(hkjc_odds_missing)
-    ### new suggestion
-    hkjc_odds = hkjc_odds[which(!is.na(findind)),]
-    
     newMapping  <- newMappingSuggestion(model_odds,unique(c( hkjc_odds_missing$HomeTeam,hkjc_odds_missing$AwayTeam)))
     print("Add to mapping?")
     newMapping
-    addToMappingFile(   newMapping)
+    addToMappingFile(newMapping)
   }
+  BettingSuggestion = BetSignal(hkjc_odds,findind)
+  BettingSuggestion  
   
   ### Continue with betting action 
   
-  BettingSuggestion = BetSignal(hkjc_odds,findind)
-  BettingSuggestion
+
 }
 
 #View(BettingSuggestion)
