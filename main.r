@@ -8,6 +8,10 @@ library(jsonlite)
 #################################
 
 
+###############################
+# Random stuff for feature A2
+#################################
+
 
 kellyBet <- function(odd_model, odd_hkjc)
 {
