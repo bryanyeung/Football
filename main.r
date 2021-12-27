@@ -223,7 +223,7 @@ kellyToBet <- function(x)
   return ( 10*floor(round( ifelse( x > 0, x*100 , 0 ),1)))
 }
 
-BetSignal <- function( hkjc_odds, findind)
+BetSignal <- function( hkjc_odds, findind, model_odds)
 {
   hkjc_odds = hkjc_odds[!is.na(findind),]
   findind = findind[!is.na(findind)]

@@ -25,11 +25,22 @@ if(nrow(hkjc_odds) == 0)
     newMapping  <- newMappingSuggestion(model_odds,unique(c( hkjc_odds_missing$HomeTeam,hkjc_odds_missing$AwayTeam)))
     print("Add to mapping?")
     newMapping
-    addToMappingFile(newMapping)
+    if(nrow(newMapping))
+    {
+      addToMappingFile(newMapping)
+      
+    }
   }
-  BettingSuggestion = BetSignal(hkjc_odds,findind)
-  BettingSuggestion  
+  BettingSuggestion = BetSignal(hkjc_odds,findind,model_odds)
+  cleanBettingSuggestion = subset(BettingSuggestion, HomeM + DrawM + AwayM < Inf)  
   
+  
+  #cleanBettingSuggestion
+  
+subset(cleanBettingSuggestion, HomeBet  > 0 ) 
+
+  
+    
   ### Continue with betting action 
   
 
