@@ -3,6 +3,11 @@ require(curl)
 
 library(jsonlite)
 
+###############################
+# Random stuff for feature A
+#################################
+
+
 
 kellyBet <- function(odd_model, odd_hkjc)
 {
