@@ -32,16 +32,17 @@ m6 <- function() {sort(sample(c(1:49),6))}
 getModelFile <- function( )
 {
   url<- "https://projects.fivethirtyeight.com/soccer-api/club/spi_matches_latest.csv"
-  destfile = "tmp.csv"
+  destfile = "data/tmp.csv"
   x <- download.file(url, destfile = destfile)
   raw = read.csv  (destfile)
   return (raw)
 }
 
-# Wanted Leagues in Model
+# Wanted Leagues in Model file
 getLeagues <- function()
 {
   return (  leagues = c("UEFA Europa League", "UEFA Champions League",
+                        "UEFA Europa Conference League",
                         "Barclays Premier League","English League Championship","English League One",
                         "English League Two" ,
                         "French Ligue 1", "French Ligue 2", "Italy Serie A",
@@ -51,15 +52,19 @@ getLeagues <- function()
                         "Major League Soccer",
                         "Swedish Allsvenskan", "Norwegian Tippeligaen",
                         "Scottish Premiership",
-                        "Japanese J League","Russian Premier Liga"))
+                        "Japanese J League","Russian Premier Liga"
+                        #,"Brasileiro SÃ©rie A", "Argentina Primera Division"
+                        ))
 }
 
 # Leagues Ignored in HKJC 
 getIgnoredLeagues <- function()
 {
-  return ( c("UE Conference","Dutch Division 2","Chilean Division 1", "South American Cup", "Japanese Division 2","Argentine Division 1", "Mexican Premier",
-             "Korean Division 1","Brazilian Division 1","Eng League Trophy","Japanese League Cup","Euro Nations League"
-             ,"WC Qualifiers","Argentine Cup", "International Matches", "U21 Euro Qualifiers"))
+  return ( c("Dutch Division 2","Chilean Division 1", "South American Cup", "Japanese Division 2", "Mexican Premier",
+             "Korean Division 1","Eng League Trophy","Japanese League Cup","Euro Nations League"
+             ,"WC Qualifiers","Argentine Cup", "International Matches", "U21 Euro Qualifiers"
+             ,"Brazilian Division 1", "Argentine Division 1", "U23 Asian Cup"
+             ))
 }
 
 sanitizeName <- function (name )
@@ -74,7 +79,7 @@ sanitizeName <- function (name )
   return (name)
 }
 
-getModelOdds <- function(nday)
+getModelOdds <- function(raw, nday)
 {
   
   today = Sys.Date()
@@ -91,7 +96,9 @@ getModelOdds <- function(nday)
                         Team2 = unlist(lapply( x$team2, sanitizeName)),
                         Win =  round( 1/x$prob1,digits =2), 
                         Draw = round(1 / x$probtie,digits =2),
-                        Lose = round(1/x$prob2,digits =2)
+                        Lose = round(1/x$prob2,digits =2),
+                        spi1 = x$spi1,
+                        spi2 = x$spi2
                         #ProjScore1 = x$proj_score1,
                         #ProjScore2 = x$proj_score2, 
                         #ProjTotalScore = x$proj_score1 + x$proj_score2
@@ -145,14 +152,14 @@ SaveMatchTeams <- function( mapping)
 }
 
 LoadMatchTeams <- function(){
-  res = read.csv(file = 'Matching.csv',header = TRUE)
+  res = read.csv(file = 'data/Matching.csv',header = TRUE)
   
   if ( nrow( res[ which (duplicated(res$Model)),])!= 0 |
        nrow( res[ which (duplicated(res$JC)),])!= 0 )
   {
-    print ("ERROR: DUPLICATE")
+    print ("ERROR: DUPLICATE in matching.csv")
     print( res[ which (duplicated(res$Model)),])
-    
+    print( res[ which (duplicated(res$Model)),])
   }
   
   # Doesnt work for some reason, maybe the encoding during source('main/r')
@@ -231,18 +238,110 @@ kellyToBet <- function(x)
 {
   return ( 10*floor(round( ifelse( x > 0, x*100 , 0 ),1)))
 }
+kellyToBetAggressive <- function(x)
+{
+  return ( 10*round(round( ifelse( x > 0, x*100 , 0 ),1)))
+}
+
+archiveBetData <- function (betData)
+{
+  if(nrow(betData)==0)
+  {
+    return(0)
+  }
+    
+  filepath = "data/betdata.rds"
+  if (!file.exists(filepath))
+  {
+    saveRDS(betData,file = filepath)
+    return(0)
+  }
+  
+  existingData = readRDS(file =filepath)
+  hasOverlap =  existingData[nrow(existingData)]$MatchDate >= betData[1]$MatchDate
+  
+  if (!hasOverlap)
+  {
+    saveRDS(rbind(existingData, betData), file= filepath)
+    return(0)
+  }
+
+  #Looking for repeated rows
+  startInd = min(which(existingData$MatchDate == betData$MatchDate[1]))
+  endInd = nrow(existingData)
+  
+  compareTarget = existingData[startInd:endInd]
+  
+  newMatchInds = c()
+  changedOddInds = c()
+  
+  for(i in 1:nrow(betData))
+  {
+    entry = betData[i]
+
+    sameMatch = which(compareTarget$MatchDate == entry$MatchDate & 
+                      compareTarget$Home == entry$Home &
+                      compareTarget$Away == entry$Away )
+    
+    if (length(sameMatch)==0) {
+      newMatchInds =c(newMatchInds,i)
+      next
+    }
+
+    #if exactly the same
+    prevEntry =  compareTarget[sameMatch[length(sameMatch)]]
+    isIdentical = prevEntry$HomeM == entry$HomeM &
+      prevEntry$AwayM == entry$AwayM &
+      prevEntry$HomeJ == entry$HomeJ &
+      prevEntry$AwayJ == entry$AwayJ
+    if(isIdentical)
+      next
+    
+    changedOddInds = c(changedOddInds, i)
+  }    
+  
+  # Save new maches
+  if(length(newMatchInds)>0)
+  {
+    saveRDS(rbind(existingData, betData[newMatchInds]), file= filepath)
+  }
+  
+  # There is no way to tell whether the odd change is due to mid-game. need manual work
+  if(length(changedOddInds)>0)
+  {
+    changedData = betData[changedOddInds]
+    changedFilename = paste( "data/", gsub(" ","_", gsub("[:-]","_",  changedData$DataTime[1])) ,"_change.rds",sep = "")
+    saveRDS(changedData, file = changedFilename )
+    warning("ALERT!!!!!!!!!!!!! file generated: ",changedFilename)
+    print(changedData)
+  }
+}
+
+
 
 BetSignal <- function( hkjc_odds, findind, model_odds)
 {
   hkjc_odds = hkjc_odds[!is.na(findind),]
   findind = findind[!is.na(findind)]
-  ModelImpHomeOdd = model_odds$Win[findind]
-  ModelImpDrawOdd = model_odds$Draw[findind]
-  ModelImpAwayOdd = model_odds$Lose[findind]
+
+  betData = data.table( DataTime= Sys.time(),
+                        MatchDate = model_odds$Date[findind],
+                        League = model_odds$League[findind],
+                        Home = model_odds$Team1[findind],
+                        Away =  model_odds$Team2[findind],
+                        HomeM = ModelImpHomeOdd,
+                        DrawM = ModelImpDrawOdd,
+                        AwayM = ModelImpAwayOdd,
+                        HomeJ = hkjc_odds$HomeOdd,
+                        DrawJ = hkjc_odds$DrawOdd,
+                        AwayJ = hkjc_odds$AwayOdd,
+                        HomeSpi = model_odds$spi1[findind],
+                        AwaySpi = model_odds$spi2[findind],
+                        Score1 = NA,
+                        Score2 = NA
+                        )
   
-  HomeBet <-kellyToBet(kellyBet(ModelImpHomeOdd , hkjc_odds$HomeOdd))
-  AwayBet <-kellyToBet(kellyBet(ModelImpAwayOdd , hkjc_odds$AwayOdd))
-  DrawBet <-kellyToBet(kellyBet(ModelImpDrawOdd , hkjc_odds$DrawOdd))
+  archiveBetData(betData)
   
   haveSignal = which( HomeBet>0 | AwayBet >0 | DrawBet >0 )
   if ( length(haveSignal)==0) 
@@ -250,6 +349,14 @@ BetSignal <- function( hkjc_odds, findind, model_odds)
     print ("No signal")
     return (NULL)
   }
+  ModelImpHomeOdd = model_odds$Win[findind]
+  ModelImpDrawOdd = model_odds$Draw[findind]
+  ModelImpAwayOdd = model_odds$Lose[findind]
+  
+  HomeBet <-kellyToBetAggressive(kellyBet(ModelImpHomeOdd , hkjc_odds$HomeOdd))
+  AwayBet <-kellyToBetAggressive(kellyBet(ModelImpAwayOdd , hkjc_odds$AwayOdd))
+  DrawBet <-kellyToBetAggressive(kellyBet(ModelImpDrawOdd , hkjc_odds$DrawOdd))
+  
   
   Result = data.table ( Day= hkjc_odds$MatchDay,
                         Num = hkjc_odds$MatchNum,
@@ -261,6 +368,7 @@ BetSignal <- function( hkjc_odds, findind, model_odds)
                         HomeM = ModelImpHomeOdd,
                         DrawM = ModelImpDrawOdd,
                         AwayM = ModelImpAwayOdd)
+  
   return(Result[haveSignal,])
 }
 
