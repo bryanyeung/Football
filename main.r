@@ -120,8 +120,12 @@ ReadOddsFromPath <- function(json_path)
 {
   #oddsdata  = read_json(json_file, simplifyVector = TRUE, flatten= TRUE)[[2]][[2]]
   oddsdata =  fromJSON(json_path,simplifyVector = TRUE, flatten= TRUE)[[2]][[2]]
-  oddsdata = oddsdata[which(is.na(oddsdata$livescore.home)),] #Filter started game
   
+  if (!is.null(oddsdata$livescore.home))
+  {
+    oddsdata = oddsdata[which(is.na(oddsdata$livescore.home)),] #Filter started game
+  }
+ 
   res = data.table ( 
     MatchNum = oddsdata$matchNum,
     MatchDate = as.Date(oddsdata$matchDate ),
