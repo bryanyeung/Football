@@ -3,16 +3,6 @@ require(curl)
 
 library(jsonlite)
 
-###############################
-# Random stuff for feature A
-#################################
-
-
-###############################
-# Random stuff for feature A2
-#################################
-
-
 kellyBet <- function(odd_model, odd_hkjc)
 {
   p = 1/ odd_model
@@ -27,7 +17,7 @@ kellyBet_p <- function(odd_model_p, odd_hkjc_p)
   return(kellyBet(odd_model_p/100,odd_hkjc_p/100) *100)
 }
 
-m6 <- function() {sort(sample(c(1:49),6))}
+m6 <- function() {sort(sample(1:49,6))}
 
 getModelFile <- function( )
 {
@@ -130,6 +120,8 @@ ReadOddsFromPath <- function(json_path)
 {
   #oddsdata  = read_json(json_file, simplifyVector = TRUE, flatten= TRUE)[[2]][[2]]
   oddsdata =  fromJSON(json_path,simplifyVector = TRUE, flatten= TRUE)[[2]][[2]]
+  oddsdata = oddsdata[which(is.na(oddsdata$livescore.home)),] #Filter started game
+  
   res = data.table ( 
     MatchNum = oddsdata$matchNum,
     MatchDate = as.Date(oddsdata$matchDate ),
@@ -243,6 +235,12 @@ kellyToBetAggressive <- function(x)
   return ( 10*round(round( ifelse( x > 0, x*100 , 0 ),1)))
 }
 
+getBetData <- function()
+{
+  filepath = "data/betdata.rds"
+  return(readRDS(file = filepath))
+}
+
 archiveBetData <- function (betData)
 {
   if(nrow(betData)==0)
@@ -262,7 +260,7 @@ archiveBetData <- function (betData)
   
   if (!hasOverlap)
   {
-    saveRDS(rbind(existingData, betData), file= filepath)
+    saveRDS(rbind(existingData, betData, fill = TRUE), file= filepath)
     return(0)
   }
 
@@ -274,6 +272,7 @@ archiveBetData <- function (betData)
   
   newMatchInds = c()
   changedOddInds = c()
+  prevOddInds = c()
   
   for(i in 1:nrow(betData))
   {
@@ -298,12 +297,13 @@ archiveBetData <- function (betData)
       next
     
     changedOddInds = c(changedOddInds, i)
+    prevOddInds = c(prevOddInds,sameMatch[length(sameMatch)])
   }    
   
   # Save new maches
   if(length(newMatchInds)>0)
   {
-    saveRDS(rbind(existingData, betData[newMatchInds]), file= filepath)
+    saveRDS(rbind(existingData, betData[newMatchInds],fill = TRUE), file= filepath)
   }
   
   # There is no way to tell whether the odd change is due to mid-game. need manual work
@@ -311,9 +311,18 @@ archiveBetData <- function (betData)
   {
     changedData = betData[changedOddInds]
     changedFilename = paste( "data/", gsub(" ","_", gsub("[:-]","_",  changedData$DataTime[1])) ,"_change.rds",sep = "")
-    saveRDS(changedData, file = changedFilename )
-    warning("ALERT!!!!!!!!!!!!! file generated: ",changedFilename)
-    print(changedData)
+    changedData$PrevRow = prevOddInds
+     
+    print ("From: ")
+    print(existingData[prevOddInds,c(2,3,4,5,10,11,12)]) 
+    
+    print("To: ")
+    print(changedData[,c(2,3,4,5,10,11,12)])
+    warning("ALERT!!!!!!!!!!!!! Odds have changed")
+    saveRDS(rbind(readRDS(file =filepath), changedData, fill = TRUE), file= filepath)
+    
+    #saveRDS(changedData, file = changedFilename )
+    #warning("ALERT!!!!!!!!!!!!! Odds have changed. File generated: ",changedFilename)
   }
 }
 
@@ -323,9 +332,18 @@ BetSignal <- function( hkjc_odds, findind, model_odds)
 {
   hkjc_odds = hkjc_odds[!is.na(findind),]
   findind = findind[!is.na(findind)]
-
+  ModelImpHomeOdd = model_odds$Win[findind]
+  ModelImpDrawOdd = model_odds$Draw[findind]
+  ModelImpAwayOdd = model_odds$Lose[findind]
+  HomeBet <-kellyToBetAggressive(kellyBet(ModelImpHomeOdd , hkjc_odds$HomeOdd))
+  AwayBet <-kellyToBetAggressive(kellyBet(ModelImpAwayOdd , hkjc_odds$AwayOdd))
+  DrawBet <-kellyToBetAggressive(kellyBet(ModelImpDrawOdd , hkjc_odds$DrawOdd))
+  
+  
   betData = data.table( DataTime= Sys.time(),
                         MatchDate = model_odds$Date[findind],
+                        #jcMatchDate = hkjc_odds$MatchDate,
+                        MatchNum = hkjc_odds$MatchNum,
                         League = model_odds$League[findind],
                         Home = model_odds$Team1[findind],
                         Away =  model_odds$Team2[findind],
@@ -349,14 +367,8 @@ BetSignal <- function( hkjc_odds, findind, model_odds)
     print ("No signal")
     return (NULL)
   }
-  ModelImpHomeOdd = model_odds$Win[findind]
-  ModelImpDrawOdd = model_odds$Draw[findind]
-  ModelImpAwayOdd = model_odds$Lose[findind]
   
-  HomeBet <-kellyToBetAggressive(kellyBet(ModelImpHomeOdd , hkjc_odds$HomeOdd))
-  AwayBet <-kellyToBetAggressive(kellyBet(ModelImpAwayOdd , hkjc_odds$AwayOdd))
-  DrawBet <-kellyToBetAggressive(kellyBet(ModelImpDrawOdd , hkjc_odds$DrawOdd))
-  
+
   
   Result = data.table ( Day= hkjc_odds$MatchDay,
                         Num = hkjc_odds$MatchNum,
