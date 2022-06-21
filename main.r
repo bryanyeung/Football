@@ -245,6 +245,13 @@ getBetData <- function()
   return(readRDS(file = filepath))
 }
 
+saveBetaData <- function(x)
+{
+  filepath = "data/betdata.rds"
+  saveRDS(x, file = filepath)
+}
+
+
 archiveBetData <- function (betData)
 {
   if(nrow(betData)==0)
@@ -315,10 +322,10 @@ archiveBetData <- function (betData)
   {
     changedData = betData[changedOddInds]
     changedFilename = paste( "data/", gsub(" ","_", gsub("[:-]","_",  changedData$DataTime[1])) ,"_change.rds",sep = "")
-    changedData$PrevRow = prevOddInds
+    changedData$PrevRow = prevOddInds + startInd - 1
      
     print ("From: ")
-    print(existingData[prevOddInds,c(2,3,4,5,10,11,12)]) 
+    print(compareTarget[prevOddInds,c(2,3,4,5,10,11,12)]) 
     
     print("To: ")
     print(changedData[,c(2,3,4,5,10,11,12)])
@@ -344,36 +351,36 @@ BetSignal <- function( hkjc_odds, findind, model_odds)
   DrawBet <-kellyToBetAggressive(kellyBet(ModelImpDrawOdd , hkjc_odds$DrawOdd))
   
   
-  betData = data.table( DataTime= Sys.time(),
-                        MatchDate = model_odds$Date[findind],
-                        #jcMatchDate = hkjc_odds$MatchDate,
-                        MatchNum = hkjc_odds$MatchNum,
-                        League = model_odds$League[findind],
-                        Home = model_odds$Team1[findind],
-                        Away =  model_odds$Team2[findind],
-                        HomeM = ModelImpHomeOdd,
-                        DrawM = ModelImpDrawOdd,
-                        AwayM = ModelImpAwayOdd,
-                        HomeJ = hkjc_odds$HomeOdd,
-                        DrawJ = hkjc_odds$DrawOdd,
-                        AwayJ = hkjc_odds$AwayOdd,
-                        HomeSpi = model_odds$spi1[findind],
-                        AwaySpi = model_odds$spi2[findind],
-                        Score1 = NA,
-                        Score2 = NA
-                        )
-  
-  archiveBetData(betData)
-  
+
+  if (length(findind)>0)
+  {
+    betData = data.table( DataTime= Sys.time(),
+                          MatchDate = model_odds$Date[findind],
+                          #jcMatchDate = hkjc_odds$MatchDate,
+                          MatchNum = hkjc_odds$MatchNum,
+                          League = model_odds$League[findind],
+                          Home = model_odds$Team1[findind],
+                          Away =  model_odds$Team2[findind],
+                          HomeM = ModelImpHomeOdd,
+                          DrawM = ModelImpDrawOdd,
+                          AwayM = ModelImpAwayOdd,
+                          HomeJ = hkjc_odds$HomeOdd,
+                          DrawJ = hkjc_odds$DrawOdd,
+                          AwayJ = hkjc_odds$AwayOdd,
+                          HomeSpi = model_odds$spi1[findind],
+                          AwaySpi = model_odds$spi2[findind],
+                          Score1 = NA,
+                          Score2 = NA
+    )
+    
+    archiveBetData(betData)
+  }
   haveSignal = which( HomeBet>0 | AwayBet >0 | DrawBet >0 )
   if ( length(haveSignal)==0) 
   {
     print ("No signal")
     return (NULL)
   }
-  
-
-  
   Result = data.table ( Day= hkjc_odds$MatchDay,
                         Num = hkjc_odds$MatchNum,
                         HomeBet = HomeBet, 
@@ -450,3 +457,99 @@ newMappingSuggestion <-function(model_odds, unresolvedJCNames)
   if (nrow(mapping)== 0) return (mapping)
   return (mapping[which(JC!=Model)])
 }
+
+markResult <- function(raw)
+{
+  archived = getBetData()
+  
+  noResultInds = which(is.na(archived$Score1))
+  
+  if (length(noResultInds)==0)
+    return (0)
+  
+  minDate = min(archived$MatchDate[noResultInds])
+  maxDate = max(archived$MatchDate[noResultInds])
+  
+  results = subset(raw, date>=minDate & date <= maxDate)
+  
+  #todo lapply?
+  for ( i in 1:length(noResultInds))
+  {
+    entry  = archived[noResultInds[i]]
+    findInd = which( results$date == entry$MatchDate &
+                       results$team1 == entry$Home & 
+                       results$team2 == entry$Away )
+    
+    if( length(findInd)==0)
+      next
+    
+    archived$Score1[i] = results$score1[findInd[1]] 
+    archived$Score2[i] = results$score2[findInd[1]] 
+  }
+  
+  filepath = "data/betdata.rds"
+  saveRDS(archived,file = filepath)
+}
+
+sanitizeBetData<- function()
+{
+  tmp = getBetData()
+  
+  i = 2 
+  while(TRUE) # no for loop becoz we want to delete rows
+  {
+    if (i > nrow(tmp)) break;
+    
+    entry = tmp[i]
+    prevInds = which(tmp$MatchDate[1:(i-1)] == entry$MatchDate & tmp$MatchNum[1:(i-1)] == entry$MatchNum)
+    if(length(prevInds)==0)
+    {
+      i <- i+1
+      next
+    }
+    
+    #verify prevRow
+    prevRow = prevInds[length(prevInds)]
+    if ( is.na( entry$PrevRow) | entry$PrevRow != prevRow )
+    {
+      #warning(paste("Incorrect prevRow value found at row", i )) 
+      tmp$PrevRow[i] = prevRow
+    }
+    
+    if (entry$Score1 !=  tmp$Score1[prevInds[length(prevInds)]]  |
+        entry$Score2 !=  tmp$Score2[prevInds[length(prevInds)]]  )
+    {
+      warning(paste("Inconsistent Score found at row ",i))
+      break; ## need attention
+    }
+    
+    next_ind = i+1
+    #verify if identical odd
+    if( entry$HomeM == tmp$HomeM[prevInds[length(prevInds)]] &
+        entry$AwayM == tmp$AwayM[prevInds[length(prevInds)]] & 
+        entry$HomeJ == tmp$HomeJ[prevInds[length(prevInds)]] & 
+        entry$AwayJ == tmp$AwayJ[prevInds[length(prevInds)]] 
+        )
+    {
+      #remove?
+      #warning(paste("identical odds found at row", i ))      
+      if(i == nrow(tmp))
+      {
+        tmp = tmp[1:(i-1)]
+      } else
+      {
+        len= nrow(tmp)
+        tmp$PrevRow[(i+1):len] =  tmp$PrevRow[(i+1):len] -1 
+        tmp = tmp[c(1:(i-1),(i+1):len )]
+        next_ind = i 
+      }
+    }
+    i = next_ind
+  }
+  
+  saveBetaData(tmp)
+  
+}
+
+
+

@@ -2,6 +2,7 @@ source('main.r' )
 
 ##### 1.  Prepare Model
 raw = getModelFile()
+markResult(raw)
 model_odds = getModelOdds(raw,4) 
 
 #### 2. Manually download json  TODO automate this 
@@ -30,10 +31,11 @@ if(nrow(hkjc_odds) == 0)
     }
   }
   BettingSuggestion = BetSignal(hkjc_odds,findind,model_odds)
-  cleanBettingSuggestion = subset(BettingSuggestion, HomeM + DrawM + AwayM < Inf)  
-  cleanBettingSuggestion
+  if(!is.null(BettingSuggestion))
+  {
+    cleanBettingSuggestion = subset(BettingSuggestion, HomeM + DrawM + AwayM < Inf)  
+    cleanBettingSuggestion
+  }
 }
 
-
-
-
+#View(getBetData())
