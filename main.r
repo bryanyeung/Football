@@ -149,26 +149,54 @@ SaveMatchTeams <- function( mapping)
 
 LoadMatchTeams <- function(){
   res = read.csv(file = 'data/Matching.csv',header = TRUE)
+  additionals = loadAdditionalNames()
+  res = rbind(res, additionals)
   
   if ( nrow( res[ which (duplicated(res$Model)),])!= 0 |
        nrow( res[ which (duplicated(res$JC)),])!= 0 )
   {
     print ("ERROR: DUPLICATE in matching.csv")
     print( res[ which (duplicated(res$Model)),])
-    print( res[ which (duplicated(res$Model)),])
+    print( res[ which (duplicated(res$JC)),])
   }
   
   # Doesnt work for some reason, maybe the encoding during source('main/r')
+  #res = data.frame()
+  #res = rbind ( res , c("IFK VÃ¤rnamo","Varnamo"))
   #res = rbind ( res , c("1. FC NÃ¼rnberg","Nurnberg"))
   #res = rbind ( res , c("Fortuna DÃ¼sseldorf","Dusseldorf"))
   #res = rbind ( res , c("AlavÃ©s","Alaves"))
   #res = rbind ( res , c("SpVgg Greuther FÃ¼rth","Greuther Furth"))
   #res = rbind ( res , c("Ã–stersunds FK" ,"Ostersunds FK"))
   #res = rbind ( res , c("Sporting GijÃ³n" ,"Sporting Gijon"))
+  #newMappings = data.table(Model = res[,1], JK = res[,2] )
   
   return ( res)
 }
 
+loadAdditionalNames <- function()
+{
+  
+  file_path = 'data/additionalMappings.rds'
+  if (!file.exists(file_path))
+  {
+    return (data.table())
+  }
+  return(readRDS(file_path))
+}
+
+addAdditionalNames<- function(newMappings)
+{
+  file_path = 'data/additionalMappings.rds'
+  if (!file.exists(file_path))
+  {
+    saveRDS(newMappings,file = file_path)
+    return(0)
+  }
+  
+  oldData  = loadAdditionalNames()
+  saveRDS(rbind(oldData,newMapping), file = file_path)
+}
 
 addToMappingFile <- function(newMapping)
 {
@@ -325,10 +353,12 @@ archiveBetData <- function (betData)
     changedData$PrevRow = prevOddInds + startInd - 1
      
     print ("From: ")
-    print(compareTarget[prevOddInds,c(2,3,4,5,10,11,12)]) 
+    
+    displayColInds <- c(2,3,5,6,10,11,12)
+    print(compareTarget[prevOddInds,..displayColInds]) 
     
     print("To: ")
-    print(changedData[,c(2,3,4,5,10,11,12)])
+    print(changedData[,..displayColInds])
     warning("ALERT!!!!!!!!!!!!! Odds have changed")
     saveRDS(rbind(readRDS(file =filepath), changedData, fill = TRUE), file= filepath)
     
@@ -356,7 +386,7 @@ BetSignal <- function( hkjc_odds, findind, model_odds)
   {
     betData = data.table( DataTime= Sys.time(),
                           MatchDate = model_odds$Date[findind],
-                          #jcMatchDate = hkjc_odds$MatchDate,
+                          #MatchDateJ = hkjc_odds$MatchDate,
                           MatchNum = hkjc_odds$MatchNum,
                           League = model_odds$League[findind],
                           Home = model_odds$Team1[findind],
@@ -470,25 +500,28 @@ markResult <- function(raw)
   minDate = min(archived$MatchDate[noResultInds])
   maxDate = max(archived$MatchDate[noResultInds])
   
-  results = subset(raw, date>=minDate & date <= maxDate)
+  results = subset(raw, date >=minDate &
+                        date <= maxDate &
+                        !is.na(score1) &
+                        !is.na(score2))
   
   #todo lapply?
   for ( i in 1:length(noResultInds))
   {
     entry  = archived[noResultInds[i]]
     findInd = which( results$date == entry$MatchDate &
-                       results$team1 == entry$Home & 
-                       results$team2 == entry$Away )
+                     results$team1 == entry$Home & 
+                     results$team2 == entry$Away )
     
-    if( length(findInd)==0)
+    if(length(findInd)==0)
+    {
       next
-    
-    archived$Score1[i] = results$score1[findInd[1]] 
-    archived$Score2[i] = results$score2[findInd[1]] 
+    }
+    archived$Score1[noResultInds[i]] = results$score1[findInd[1]] 
+    archived$Score2[noResultInds[i]] = results$score2[findInd[1]] 
   }
   
-  filepath = "data/betdata.rds"
-  saveRDS(archived,file = filepath)
+  saveBetaData(archived)
 }
 
 sanitizeBetData<- function()
@@ -501,9 +534,19 @@ sanitizeBetData<- function()
     if (i > nrow(tmp)) break;
     
     entry = tmp[i]
-    prevInds = which(tmp$MatchDate[1:(i-1)] == entry$MatchDate & tmp$MatchNum[1:(i-1)] == entry$MatchNum)
+    prevInds = which(tmp$MatchDate[1:(i-1)] == entry$MatchDate & 
+                     tmp$MatchNum[1:(i-1)] == entry$MatchNum & 
+                     tmp$Home[1:(i-1)] == entry$Home &
+                       tmp$Away[1:(i-1)] == entry$Away
+                       )
     if(length(prevInds)==0)
     {
+      if (!is.na(entry$PrevRow))
+      {
+        warning(paste("wrong prevRow,should be NA at ", i))
+        tmp$PrevRow[i] = NA
+      }
+      
       i <- i+1
       next
     }
@@ -516,8 +559,10 @@ sanitizeBetData<- function()
       tmp$PrevRow[i] = prevRow
     }
     
-    if (entry$Score1 !=  tmp$Score1[prevInds[length(prevInds)]]  |
-        entry$Score2 !=  tmp$Score2[prevInds[length(prevInds)]]  )
+    if ( ( !is.na(entry$Score1) &&
+           !is.na(entry$Score2)) && (
+        entry$Score1 !=  tmp$Score1[prevInds[length(prevInds)]]  |
+        entry$Score2 !=  tmp$Score2[prevInds[length(prevInds)]] ) )
     {
       warning(paste("Inconsistent Score found at row ",i))
       break; ## need attention
@@ -532,7 +577,7 @@ sanitizeBetData<- function()
         )
     {
       #remove?
-      #warning(paste("identical odds found at row", i ))      
+      #warning(paste("identical odds found at row", i ))
       if(i == nrow(tmp))
       {
         tmp = tmp[1:(i-1)]
