@@ -30,3 +30,51 @@ getPastModelResult <- function(raw, nday)
   
   return (result)
 }
+
+
+tmpanalysis <- function()
+{
+  matchData = getBetData()
+  matchData$Result = sign(matchData$Score1 - matchData$Score2)
+  matchData$HomeSignal = matchData$HomeJ > matchData$HomeM 
+  matchData$AwaySignal = matchData$AwayJ > matchData$AwayM 
+  matchData$DrawSignal = matchData$DrawJ > matchData$DrawM 
+  matchData$hasSignal = matchData$HomeSignal | matchData$AwaySignal | matchData$DrawSignal 
+  matchData$betAction = matchData$hasSignal & is.na(matchData$PrevRow)
+  matchData$alreadyBet = matchData$betAction
+  
+  
+  for( i in 1:nrow(matchData))
+  {
+    if (!is.na(matchData$PrevRow[i]))
+    {
+      # has prev 
+      if (matchData$alreadyBet[matchData$PrevRow[i]])
+      {
+        matchData$alreadyBet[i] = TRUE
+      } 
+      else
+      {
+        if (matchData$hasSignal[i])
+        {
+          matchData$betAction[i] = TRUE
+          matchData$alreadyBet[i] = TRUE
+        }
+      }
+    }
+  }
+  
+  x = ifelse( matchData$betAction,
+              matchData$HomeSignal * (ifelse(matchData$Result == 1 , matchData$HomeJ,0)-1) +
+                matchData$AwaySignal * (ifelse(matchData$Result == -1 ,matchData$AwayJ,0)-1) +
+                matchData$DrawSignal * (ifelse(matchData$Result == 0 ,matchData$DrawJ,0)-1)
+              , 0)
+  
+  x[which(is.na(x))]=0
+  
+  matchData$PnL = x 
+  y = subset(matchData, betAction)$PnL
+}
+
+
+

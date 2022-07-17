@@ -217,7 +217,7 @@ addToMappingFile <- function(newMapping)
 resolveInd <- function( team, modelTeams,storedMatch)
 {
   if( team %in% modelTeams )
-    return (which(team == modelTeams)[1])
+    return (which(team == modelTeams))
   
   #Look up mapping
   findFromMapping = which( storedMatch$JC == team)
@@ -226,9 +226,9 @@ resolveInd <- function( team, modelTeams,storedMatch)
     teamModelName = storedMatch$Model[findFromMapping[1]]
     findmatch =  which(modelTeams == teamModelName)
     if (length(findmatch)>0)
-      return (findmatch[1])
+      return (findmatch)
   }
-  return (NA)  
+  return (c())  
 }
 
 MatchRowInds <- function(hkjc_odds, model_odds)
@@ -239,20 +239,15 @@ MatchRowInds <- function(hkjc_odds, model_odds)
   findind = c()
   for (i in 1:nrow(hkjc_odds)) 
   {
-    
-    
+  
     x = resolveInd( hkjc_odds$HomeTeam[i],model_odds$Team1,storedMatch)
     y = resolveInd( hkjc_odds$AwayTeam[i],model_odds$Team2,storedMatch)
     
-  
-    if ( is.na(x)  | is.na(y)  | x!=y )
+    commonRow = intersect(x,y)
+    if (length(commonRow) == 1)
     {
-      #### not found 
-      findind[i]=NA
+      findind[i] = commonRow[1]
       next
-    } else
-    {
-      findind[i] = x 
     }
   }
   return(findind)
@@ -371,7 +366,15 @@ archiveBetData <- function (betData)
 
 BetSignal <- function( hkjc_odds, findind, model_odds)
 {
-  hkjc_odds = hkjc_odds[!is.na(findind),]
+  x = which(!is.na(findind))
+  if ( length(x)==0)
+  {
+    warning("No matches")
+    return(NULL)
+  }
+  
+  
+  hkjc_odds = hkjc_odds[x,]
   findind = findind[!is.na(findind)]
   ModelImpHomeOdd = model_odds$Win[findind]
   ModelImpDrawOdd = model_odds$Draw[findind]
