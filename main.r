@@ -118,19 +118,21 @@ GetOddFromString <-function ( oddstr )
 
 ReadOddsFromPath <- function(json_path)
 {
-  #oddsdata  = read_json(json_file, simplifyVector = TRUE, flatten= TRUE)[[2]][[2]]
-  oddsdata =  fromJSON(json_path,simplifyVector = TRUE, flatten= TRUE)[[2]][[2]]
   
-  if (!is.null(oddsdata$livescore.home))
-  {
-    oddsdata = oddsdata[which(is.na(oddsdata$livescore.home)),] #Filter started game
-  }
+  oddsdata =  fromJSON(json_path, simplifyVector = TRUE, flatten= TRUE)$matches
+  
+  #if (!is.null(oddsdata$livescore.home))
+  #{
+  #  oddsdata = oddsdata[which(is.na(oddsdata$livescore.home)),] #Filter started game
+  #}
  
+  oddsdata = subset(oddsdata, matchState == "PreEvent")
+  
   res = data.table ( 
-    MatchNum = oddsdata$matchNum,
+    MatchNum =  oddsdata$frontEndId,
     MatchDate = as.Date(oddsdata$matchDate ),
     MatchDay  = oddsdata$matchDay,
-    League   =  oddsdata$league.leagueNameEN,
+    League   =  oddsdata$tournament.tournamentNameEN,
     HomeTeam = oddsdata$homeTeam.teamNameEN, 
     AwayTeam = oddsdata$awayTeam.teamNameEN, 
     HomeOdd = unlist(lapply(oddsdata$hadodds.H, GetOddFromString )), 
